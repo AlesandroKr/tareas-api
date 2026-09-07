@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, EmailStr
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker
 from tarea_db_models import Base, engine, TareaDb
+from usuario_db_models import UsuarioDb
 
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
@@ -16,10 +17,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+class NuevoUsuario(BaseModel):
+    nombre: str
+    email: EmailStr
+
+@app.post("/usuario")
+def crearUsuario(nuevoUsuario: NuevoUsuario):
+    session = Session()
+    nueva = UsuarioDb(nombre=nuevoUsuario.nombre, email=nuevoUsuario.email)
+    session.add(nueva)
+    session.commit()
+    session.close()
+    return {"Guardado": True}
+
+@app.get("/usuarios")
+def extraerUsuarioDB():
+    session = Session()
+    resultado = session.query(UsuarioDb).all()
+    session.close()
+    return {"usuarios": resultado}
+
+
 class NuevaTarea(BaseModel):
     text: str
     priority: str = "Medio"
     complete : bool = False
+    usurio_id: int
     
     @field_validator("priority")
     @classmethod
@@ -57,11 +81,12 @@ def guardarTareaDB(nuevaTarea: NuevaTarea):
     existente = session.query(TareaDb).filter(TareaDb.texto == nuevaTarea.text).first()
     if existente is not None:
         raise HTTPException(status_code=400, detail="Ya existe una tarea con ese texto")
-    nueva = TareaDb(texto=nuevaTarea.text, prioridad=nuevaTarea.priority, completado=nuevaTarea.complete)
+    nueva = TareaDb(texto=nuevaTarea.text, prioridad=nuevaTarea.priority, completado=nuevaTarea.complete, usuario_id=nuevaTarea.usuario_id)
     session.add(nueva)
     session.commit()
     session.close()
     return {"Guardado": True}
+
 
 #--------------------------
 @app.delete("/tareas/borrar/{tarea_id}")
