@@ -99,12 +99,19 @@ def guardarTareaDB(nuevaTarea: NuevaTarea):
 
 
 #--------------------------
-@app.delete("/tareas/borrar/{tarea_id}")
-def borrarTareaDB(tarea_id : int):
+@app.delete("/usuarios/{usuario_id}/tareas/borrar/{tarea_id}")
+def borrarTareaDB(tarea_id : int, usuario_id: int):
     session = Session()
-    resultado = session.query(TareaDb).filter(TareaDb.id == tarea_id).first()
     
+    usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
+    if usuario is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    resultado = session.query(TareaDb).filter(TareaDb.id == tarea_id).first()
     if resultado is None:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+    
+    if resultado.usuario_id != usuario_id:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
     
     session.delete(resultado)
@@ -113,11 +120,18 @@ def borrarTareaDB(tarea_id : int):
     return {"Eliminado": True}
 
 #---------------------------
-@app.put("/tareas/{tarea_id}")
-def marcarCompletadoDB(tarea_id: int):
+@app.put("/usuarios/{usuario_id}/tareas/{tarea_id}")
+def marcarCompletadoDB(tarea_id: int, usuario_id: int):
     session = Session()
-    resultado = session.query(TareaDb).filter(TareaDb.id == tarea_id).first()
     
+    resultado = session.query(TareaDb).filter(TareaDb.id == tarea_id).first()
+    usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
+    if usuario is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    if resultado.usuario_id != usuario_id:
+            raise HTTPException(status_code=404, detail="Tarea no encontrada")
+        
     if resultado is None:
             raise HTTPException(status_code=404, detail="Tarea no encontrada")
         
@@ -126,13 +140,13 @@ def marcarCompletadoDB(tarea_id: int):
     session.close()
     return {"Editado" : True}
 
-#---------------------------
-@app.get("/tareas/pendientes")
-def mostrarTareasPendientesDB():
-    session = Session()
-    resultado = session.query(TareaDb).filter(TareaDb.completado == False).all()
-    session.close()
-    return {"tareas": resultado}
+# #---------------------------
+# @app.get("/tareas/pendientes")
+# def mostrarTareasPendientesDB():
+#     session = Session()
+#     resultado = session.query(TareaDb).filter(TareaDb.completado == False).all()
+#     session.close()
+#     return {"tareas": resultado}
 
 #---------------------------
 @app.get("/tareas/completados")
