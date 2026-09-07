@@ -38,12 +38,22 @@ def extraerUsuarioDB():
     session.close()
     return {"usuarios": resultado}
 
+@app.get("/usuarios/{usuario_id}/tareas")
+def extraerTareasUsuarioDB(usuario_id: int):
+    session = Session()
+    usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
+    if usuario is None:
+            raise HTTPException(status_code=404, detail="No existe ese Usuario")
+    resultado = session.query(TareaDb).filter(TareaDb.usuario_id == usuario_id).all()
+    session.close()
+    return {"tareas": resultado}
+
 
 class NuevaTarea(BaseModel):
     text: str
     priority: str = "Medio"
     complete : bool = False
-    usurio_id: int
+    usuario_id: int
     
     @field_validator("priority")
     @classmethod
