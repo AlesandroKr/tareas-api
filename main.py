@@ -72,23 +72,23 @@ def extraerTareasDB():
     return {"tareas": resultado}
 
 #---------------------------
-
-#Agregar input para buscar en la lista
-
-
-@app.get("/tareas/buscar")
-def buscarTareas(texto: str):
+@app.get("/usuarios/{usuario_id}/tareas/buscar")
+def buscarTareas(texto: str, usuario_id: int):
     session = Session()
-    resultado = session.query(TareaDb).filter(TareaDb.texto.contains(texto)).all()
+    usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
+    if usuario is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    resultado = session.query(TareaDb).filter(TareaDb.texto.contains(texto), TareaDb.usuario_id == usuario_id).all()
     session.close()
     return {"tareas": resultado}
 
 
 #---------------------------
-@app.post("/tareas/guardar")
-def guardarTareaDB(nuevaTarea: NuevaTarea):
+@app.post("/usuarios/{usuario_id}/tareas/guardar")
+def guardarTareaDB(nuevaTarea: NuevaTarea, usuario_id: int):
     session = Session()
-    existente = session.query(TareaDb).filter(TareaDb.texto == nuevaTarea.text).first()
+    existente = session.query(TareaDb).filter(TareaDb.texto == nuevaTarea.text, TareaDb.usuario_id == usuario_id).first()
     if existente is not None:
         raise HTTPException(status_code=400, detail="Ya existe una tarea con ese texto")
     nueva = TareaDb(texto=nuevaTarea.text, prioridad=nuevaTarea.priority, completado=nuevaTarea.complete, usuario_id=nuevaTarea.usuario_id)
@@ -124,34 +124,51 @@ def borrarTareaDB(tarea_id : int, usuario_id: int):
 def marcarCompletadoDB(tarea_id: int, usuario_id: int):
     session = Session()
     
-    resultado = session.query(TareaDb).filter(TareaDb.id == tarea_id).first()
     usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
     if usuario is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
+    resultado = session.query(TareaDb).filter(TareaDb.id == tarea_id).first()
+    
+    #Primero comprobar si la tarea existe
+    if resultado is None:
+            raise HTTPException(status_code=404, detail="Tarea no encontrada")
+    #Luego comprobar si pertenece a dicho usuario
     if resultado.usuario_id != usuario_id:
             raise HTTPException(status_code=404, detail="Tarea no encontrada")
         
-    if resultado is None:
-            raise HTTPException(status_code=404, detail="Tarea no encontrada")
         
-    resultado.completado = not resultado.completado;
+    resultado.completado = not resultado.completado
     session.commit()
     session.close()
     return {"Editado" : True}
 
-# #---------------------------
-# @app.get("/tareas/pendientes")
-# def mostrarTareasPendientesDB():
-#     session = Session()
-#     resultado = session.query(TareaDb).filter(TareaDb.completado == False).all()
-#     session.close()
-#     return {"tareas": resultado}
+#---------------------------
+@app.get("/usuarios/{usuario_id}/tareas/pendientes")
+def mostrarTareasPendientesDB(usuario_id: int):
+    session = Session()
+    
+    usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
+    if usuario is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    resultado = session.query(TareaDb).filter(TareaDb.completado == False, TareaDb.usuario_id== usuario_id).all()
+    
+    session.close()
+    
+    return {"tareas": resultado}
 
 #---------------------------
-@app.get("/tareas/completados")
-def mostrarTareasCompletadasDB():
+@app.get("/usuarios/{usuario_id}/tareas/completados")
+def mostrarTareasCompletadasDB(usuario_id: int):
     session = Session()
-    resultado = session.query(TareaDb).filter(TareaDb.completado == True).all()
+    
+    usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
+    if usuario is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    resultado = session.query(TareaDb).filter(TareaDb.completado == True, TareaDb.usuario_id == usuario_id).all()
+    
     session.close()
+    
     return {"tareas": resultado}
