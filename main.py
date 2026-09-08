@@ -17,43 +17,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+#----- CLASES MODELOS-----
 
 class NuevoUsuario(BaseModel):
     nombre: str
     email: EmailStr
-
-@app.post("/usuario")
-def crearUsuario(nuevoUsuario: NuevoUsuario):
-    session = Session()
-    nueva = UsuarioDb(nombre=nuevoUsuario.nombre, email=nuevoUsuario.email)
-    session.add(nueva)
-    session.commit()
-    session.close()
-    return {"Guardado": True}
-
-@app.get("/usuarios")
-def extraerUsuarioDB():
-    session = Session()
-    resultado = session.query(UsuarioDb).all()
-    session.close()
-    return {"usuarios": resultado}
-
-@app.get("/usuarios/{usuario_id}/tareas")
-def extraerTareasUsuarioDB(usuario_id: int):
-    session = Session()
-    usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
-    if usuario is None:
-            raise HTTPException(status_code=404, detail="No existe ese Usuario")
-    resultado = session.query(TareaDb).filter(TareaDb.usuario_id == usuario_id).all()
-    session.close()
-    return {"tareas": resultado}
-
-
+    
 class NuevaTarea(BaseModel):
     text: str
     priority: str = "Medio"
     complete : bool = False
-    usuario_id: int
     
     @field_validator("priority")
     @classmethod
@@ -63,17 +36,62 @@ class NuevaTarea(BaseModel):
         return valor
         
 
-#---------------------------
+#------------- ENDPOINTS --------------#
 @app.get("/")
-def extraerTareasDB():
+def extraer_Tareas():
     session = Session()
     resultado = session.query(TareaDb).all()
     session.close()
     return {"tareas": resultado}
 
+
+#------------- EXTRACT AND CREATE USERS --------------
+@app.get("/usuarios")
+def extraer_Usuario():
+    session = Session()
+    resultado = session.query(UsuarioDb).all()
+    session.close()
+    return {"usuarios": resultado}
+
+@app.post("/usuario")
+def crear_Usuario(nuevoUsuario: NuevoUsuario):
+    session = Session()
+    nueva = UsuarioDb(nombre=nuevoUsuario.nombre, email=nuevoUsuario.email)
+    session.add(nueva)
+    session.commit()
+    session.close()
+    return {"Guardado": True}
 #---------------------------
+
+
+
+#------------- EXTRACT, CREATE, AND SEARCH TAKS --------------
+
+@app.get("/usuarios/{usuario_id}/tareas")
+def extraer_Tareas_Usuario(usuario_id: int):
+    session = Session()
+    usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
+    if usuario is None:
+            raise HTTPException(status_code=404, detail="No existe ese Usuario")
+    resultado = session.query(TareaDb).filter(TareaDb.usuario_id == usuario_id).all()
+    session.close()
+    return {"tareas": resultado}
+
+@app.post("/usuarios/{usuario_id}/tareas/guardar")
+def guardar_Tarea_Usuarios(nuevaTarea: NuevaTarea, usuario_id: int):
+    session = Session()
+    existente = session.query(TareaDb).filter(TareaDb.texto == nuevaTarea.text, TareaDb.usuario_id == usuario_id).first()
+    if existente is not None:
+        raise HTTPException(status_code=400, detail="Ya existe una tarea con ese texto")
+    nueva = TareaDb(texto=nuevaTarea.text, prioridad=nuevaTarea.priority, completado=nuevaTarea.complete, usuario_id=usuario_id)
+    session.add(nueva)
+    session.commit()
+    session.close()
+    return {"Guardado": True}
+
+
 @app.get("/usuarios/{usuario_id}/tareas/buscar")
-def buscarTareas(texto: str, usuario_id: int):
+def buscar_Tareas_Usuarios(texto: str, usuario_id: int):
     session = Session()
     usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
     if usuario is None:
@@ -82,25 +100,12 @@ def buscarTareas(texto: str, usuario_id: int):
     resultado = session.query(TareaDb).filter(TareaDb.texto.contains(texto), TareaDb.usuario_id == usuario_id).all()
     session.close()
     return {"tareas": resultado}
-
-
 #---------------------------
-@app.post("/usuarios/{usuario_id}/tareas/guardar")
-def guardarTareaDB(nuevaTarea: NuevaTarea, usuario_id: int):
-    session = Session()
-    existente = session.query(TareaDb).filter(TareaDb.texto == nuevaTarea.text, TareaDb.usuario_id == usuario_id).first()
-    if existente is not None:
-        raise HTTPException(status_code=400, detail="Ya existe una tarea con ese texto")
-    nueva = TareaDb(texto=nuevaTarea.text, prioridad=nuevaTarea.priority, completado=nuevaTarea.complete, usuario_id=nuevaTarea.usuario_id)
-    session.add(nueva)
-    session.commit()
-    session.close()
-    return {"Guardado": True}
 
+#------------- DELETE, CHECK, AND FILTER TAKS --------------
 
-#--------------------------
 @app.delete("/usuarios/{usuario_id}/tareas/borrar/{tarea_id}")
-def borrarTareaDB(tarea_id : int, usuario_id: int):
+def borrar_Tarea_Usuarios(tarea_id : int, usuario_id: int):
     session = Session()
     
     usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
@@ -119,9 +124,8 @@ def borrarTareaDB(tarea_id : int, usuario_id: int):
     session.close()
     return {"Eliminado": True}
 
-#---------------------------
 @app.put("/usuarios/{usuario_id}/tareas/{tarea_id}")
-def marcarCompletadoDB(tarea_id: int, usuario_id: int):
+def marcar_Completado(tarea_id: int, usuario_id: int):
     session = Session()
     
     usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
@@ -130,10 +134,9 @@ def marcarCompletadoDB(tarea_id: int, usuario_id: int):
     
     resultado = session.query(TareaDb).filter(TareaDb.id == tarea_id).first()
     
-    #Primero comprobar si la tarea existe
     if resultado is None:
             raise HTTPException(status_code=404, detail="Tarea no encontrada")
-    #Luego comprobar si pertenece a dicho usuario
+        
     if resultado.usuario_id != usuario_id:
             raise HTTPException(status_code=404, detail="Tarea no encontrada")
         
@@ -143,9 +146,8 @@ def marcarCompletadoDB(tarea_id: int, usuario_id: int):
     session.close()
     return {"Editado" : True}
 
-#---------------------------
 @app.get("/usuarios/{usuario_id}/tareas/pendientes")
-def mostrarTareasPendientesDB(usuario_id: int):
+def mostrar_Tareas_Pendientes(usuario_id: int):
     session = Session()
     
     usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
@@ -158,9 +160,9 @@ def mostrarTareasPendientesDB(usuario_id: int):
     
     return {"tareas": resultado}
 
-#---------------------------
+
 @app.get("/usuarios/{usuario_id}/tareas/completados")
-def mostrarTareasCompletadasDB(usuario_id: int):
+def mostrar_Tareas_Completadas(usuario_id: int):
     session = Session()
     
     usuario = session.query(UsuarioDb).filter(UsuarioDb.id == usuario_id).first()
@@ -172,3 +174,5 @@ def mostrarTareasCompletadasDB(usuario_id: int):
     session.close()
     
     return {"tareas": resultado}
+
+#---------------------------
