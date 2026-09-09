@@ -9,3 +9,4 @@ class UsuarioDb(tareaBase):
     id = Column(Integer, primary_key=True)
     nombre = Column(String)
     email = Column(String)
+    password_hash = Column(String)

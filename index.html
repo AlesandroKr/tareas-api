@@ -3,48 +3,61 @@
 
 <body>
     <h1>Tareas</h1>
-    <h2 id="counter"></h2>
+
 
     <div>
         <input type="text" id="input-nueva-tarea" placeholder="Nueva tarea">
         <button id="btn-guardar">Guardar</button>
+        <p id="mensaje-error" style="display: none; color: red;"></p>
     </div>
-    <p id="mensaje-error" style="display: none; color: red;"></p>
 
-
+    <h2 id="counter"></h2>
+    <div>
+        <button id="btn-todas">Ver todas</button>
+        <button id="btn-pendientes">Ver pendientes</button>
+        <button id="btn-completados">Ver completados</button>
+    </div>
 
     <div id="lista"></div>
 
-    <button id="btn-todas">Ver todas</button>
-    <button id="btn-pendientes">Ver pendientes</button>
-    <button id="btn-completados">Ver completados</button>
-
     <script>
-        fetch("http://127.0.0.1:8000/")
+
+        let usuario = JSON.parse(localStorage.getItem("usuario"));
+
+        const usuarioId = usuario.id;
+
+        fetch(`http://127.0.0.1:8000/usuarios/${usuarioId}/tareas`)
             .then(res => res.json())
             .then(data => {
                 renderizarTareas(data.tareas)
                 actualizarContador(data.tareas)
             });
 
+        //OBTENER TODAS LAS TAREAS
+
         document.getElementById("btn-todas").addEventListener("click", () => {
-            fetch("http://127.0.0.1:8000/")
+            fetch(`http://127.0.0.1:8000/usuarios/${usuarioId}/tareas`)
                 .then(res => res.json())
                 .then(data => renderizarTareas(data.tareas));
         });
+
+        //OBTENER LAS TAREAS PENDIENTES
 
         document.getElementById("btn-pendientes").addEventListener("click", () => {
-            fetch("http://127.0.0.1:8000/tareas/pendientes")
+            fetch(`http://127.0.0.1:8000/usuarios/${usuarioId}/tareas/pendientes`)
                 .then(res => res.json())
                 .then(data => renderizarTareas(data.tareas));
         });
+
+        //OBTENER LAS TAREAS COMPLETADAS
 
         document.getElementById("btn-completados").addEventListener("click", () => {
-            fetch("http://127.0.0.1:8000/tareas/completados")
+            fetch(`http://127.0.0.1:8000/usuarios/${usuarioId}/tareas/completados`)
                 .then(res => res.json())
                 .then(data => renderizarTareas(data.tareas));
         });
 
+        //ELIMINAR LAS TAREAS
 
         document.getElementById("lista").addEventListener("click", (evento) => {
             //leemos al elemento y preguntamos si pertenece a un clase llamada "btn-eliminar"
@@ -52,11 +65,15 @@
                 //Aqui extraemos el id del elemento 
                 const id = evento.target.dataset.id;
                 //hacemos una peticion para que borre el elemento con este id y (OBLIGATORIO) decimos que es directo al delete
-                fetch("http://127.0.0.1:8000/tareas/borrar/" + id, { method: "DELETE" })
+                fetch(`http://127.0.0.1:8000/usuarios/${usuarioId}/tareas/borrar/${id}`, {
+                    method: "DELETE"
+                })
                     //Recargamos la pagina al terminar de hacer la peticion
                     .then(() => location.reload())
             }
         });
+
+        //MARCAR LAS TAREAS COMO COMPLETADOS
 
         document.getElementById("lista").addEventListener("change", (evento) => {
             //leemos al elemento y preguntamos si pertenece a un clase llamada "btn-eliminar"
@@ -64,16 +81,20 @@
                 //Aqui extraemos el id del elemento 
                 const id = evento.target.dataset.id;
                 //hacemos una peticion para que borre el elemento con este id y (OBLIGATORIO) decimos que es directo al delete
-                fetch("http://127.0.0.1:8000/tareas/" + id, { method: "PUT" })
+                fetch(`http://127.0.0.1:8000/usuarios/${usuarioId}/tareas/${id}`, {
+                    method: "PUT"
+                })
                     //Recargamos la pagina al terminar de hacer la peticion
                     .then(() => location.reload())
             }
         });
 
+        //GUARDAR NUEVAS TAREAS
+
         document.getElementById("btn-guardar").addEventListener("click", () => {
             const input = document.getElementById("input-nueva-tarea").value;
 
-            fetch("http://127.0.0.1:8000/tareas/guardar", {
+            fetch(`http://127.0.0.1:8000/usuarios/${usuarioId}/tareas/guardar`, {
                 method: "POST",
                 headers: { "Content-type": "application/json" },
                 body: JSON.stringify({ text: input })
@@ -92,6 +113,8 @@
             })
         });
 
+        //BUSCAR LAS TAREA
+
         let temporizador;
 
         document.getElementById("input-nueva-tarea").addEventListener("input", (evento) => {
@@ -99,11 +122,15 @@
             clearTimeout(temporizador);
             temporizador = setTimeout(() => {
                 const texto = evento.target.value;
-                fetch("http://127.0.0.1:8000/tareas/buscar?texto=" + texto)
+                fetch(`http://127.0.0.1:8000/usuarios/${usuarioId}/tareas/buscar?texto=${texto}`)
                     .then(res => res.json())
                     .then(data => renderizarTareas(data.tareas))
             }, 300);
         });
+
+
+        //-----------------------------------------------------------
+        //FUNCION PARA MOSTRAR TODAS LAS TAREAS EN UNA LISTA DE ELEMENTOS
 
         function renderizarTareas(tareas) {
             const contenedor = document.getElementById("lista");
@@ -121,6 +148,8 @@
             });
 
         }
+
+        //FUNCION PARA ACTUALIZAR LA CANTIDAD DE TAREAS PENDIENDES Y COMPLETADAS
 
         function actualizarContador(tareas) {
             const contador = document.getElementById("counter");

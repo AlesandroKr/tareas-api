@@ -4,7 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker
 from tarea_db_models import Base, engine, TareaDb
 from usuario_db_models import UsuarioDb
+from pwdlib import PasswordHash
 
+password_hash = PasswordHash.recommended()
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 
@@ -22,6 +24,33 @@ app.add_middleware(
 class NuevoUsuario(BaseModel):
     nombre: str
     email: EmailStr
+    password: str
+    
+class LoginAccount(BaseModel):
+    email: EmailStr
+    password: str
+
+
+@app.post("/login")
+def iniciarSesion(loginAccount: LoginAccount):
+    session = Session()
+    usuario = session.query(UsuarioDb).filter(UsuarioDb.email == loginAccount.email).first()
+    
+    if usuario is None:
+        raise HTTPException(status_code=404, detail="Ese correo no está registrado")
+    
+    is_valid = password_hash.verify(loginAccount.password, usuario.password_hash)
+    
+    if is_valid is False:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    session.close()
+    
+    usuario_logged = {
+        "id": usuario.id,
+        "nombre": usuario.nombre
+    }
+    
+    return usuario_logged
     
 class NuevaTarea(BaseModel):
     text: str
@@ -56,7 +85,9 @@ def extraer_Usuario():
 @app.post("/usuario")
 def crear_Usuario(nuevoUsuario: NuevoUsuario):
     session = Session()
-    nueva = UsuarioDb(nombre=nuevoUsuario.nombre, email=nuevoUsuario.email)
+    
+    hashed_password = password_hash.hash(nuevoUsuario.password)
+    nueva = UsuarioDb(nombre=nuevoUsuario.nombre, email=nuevoUsuario.email, password_hash=hashed_password)
     session.add(nueva)
     session.commit()
     session.close()
